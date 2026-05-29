@@ -2853,15 +2853,23 @@
           const d = await r.json();
           const ollamaUp = d.ollama;
           const sdReady = d.sd_enabled;
+          const sdHealthy = d.sd_healthy;
 
           // Image engine row
           if (!sdReady) {
             D.imgEngineDot.className = 'img-engine-dot off';
             D.imgEngineStatus.textContent = 'Not Installed';
             D.imgGenBtn.disabled = true;
+          } else if (!sdHealthy) {
+            D.imgEngineDot.className = 'img-engine-dot warn';
+            D.imgEngineStatus.textContent = 'Missing VC++ Runtime';
+            D.imgWarn.innerHTML = '<strong>⚠️ Missing VC++ Redistributable</strong><br>The image engine needs Microsoft Visual C++ Redistributable.<br>Re-run the Windows installer or download it from Microsoft.';
+            D.imgWarn.style.display = 'block';
+            D.imgGenBtn.disabled = true;
           } else {
             D.imgEngineDot.className = 'img-engine-dot on';
             D.imgEngineStatus.textContent = 'Ready';
+            D.imgWarn.style.display = 'none';
           }
 
           // Chat engine row
@@ -2871,14 +2879,14 @@
             D.imgStopOllama.style.display = 'inline-block';
             D.imgStartOllama.style.display = 'none';
             D.imgGenBtn.disabled = true;
-            D.imgWarn.style.display = 'none';
           } else {
             D.chatEngineDot.className = 'img-engine-dot off';
             D.chatEngineStatus.textContent = 'Stopped';
             D.imgStopOllama.style.display = 'none';
             D.imgStartOllama.style.display = 'inline-block';
-            D.imgGenBtn.disabled = !sdReady;
-            D.imgWarn.style.display = 'none';
+            if (sdReady && sdHealthy) {
+              D.imgGenBtn.disabled = false;
+            }
           }
         } catch {
           D.chatEngineDot.className = 'img-engine-dot warn';

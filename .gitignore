@@ -10,3 +10,4 @@ Shared/logs/
 # OS files
 .DS_Store
 Thumbs.db
+__pycache__/

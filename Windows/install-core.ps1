@@ -378,6 +378,44 @@ if (Test-Path $SevenZipExe) {
 }
 
 # =================================================================
+# STEP 2c: Install Microsoft Visual C++ Redistributable (required by SD.cpp)
+# =================================================================
+Write-Host ""
+Write-Host "[2c/7] Checking Microsoft Visual C++ Redistributable..." -ForegroundColor Yellow
+
+function Test-VCRedistInstalled {
+    $sys32 = "$env:SystemRoot\System32"
+    return (Test-Path "$sys32\vcruntime140.dll") -and (Test-Path "$sys32\vcruntime140_1.dll") -and (Test-Path "$sys32\msvcp140.dll")
+}
+
+if (Test-VCRedistInstalled) {
+    Write-Host "      VC++ Redistributable already installed." -ForegroundColor Green
+} else {
+    Write-Host "      VC++ Redistributable missing. Downloading installer..." -ForegroundColor DarkGray
+    $VCRedistURL = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+    $VCRedistDest = "$USB_Drive\Shared\bin\vc_redist.x64.exe"
+    curl.exe -L --ssl-no-revoke --progress-bar $VCRedistURL -o $VCRedistDest
+    if (Test-Path $VCRedistDest) {
+        Write-Host "      Installing VC++ Redistributable (admin required)..." -ForegroundColor Yellow
+        try {
+            $proc = Start-Process -FilePath $VCRedistDest -ArgumentList "/install","/quiet","/norestart" -Wait -PassThru
+            if ($proc.ExitCode -eq 0 -or $proc.ExitCode -eq 3010) {
+                Write-Host "      VC++ Redistributable installed successfully!" -ForegroundColor Green
+            } else {
+                Write-Host "      WARNING: VC++ installer exited with code $($proc.ExitCode). You may need to install it manually." -ForegroundColor Yellow
+                Write-Host "      Download from: $VCRedistURL" -ForegroundColor DarkGray
+            }
+        } catch {
+            Write-Host "      WARNING: Could not install VC++ Redistributable (admin rights may be required)." -ForegroundColor Yellow
+            Write-Host "      Download from: $VCRedistURL" -ForegroundColor DarkGray
+        }
+    } else {
+        Write-Host "      WARNING: Could not download VC++ Redistributable. Image generation may fail with missing DLL errors." -ForegroundColor Yellow
+        Write-Host "      Download from: $VCRedistURL" -ForegroundColor DarkGray
+    }
+}
+
+# =================================================================
 # STEP 3: Download optional UI vendor assets for offline mode
 # =================================================================
 Write-Host ""

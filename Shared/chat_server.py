@@ -109,6 +109,20 @@ SD_BINARY = _find_sd_binary()
 SD_MODEL = os.path.join(SCRIPT_DIR, "models", "CyberRealistic_V3.3_FP16.safetensors")
 SD_ENABLED = SD_BINARY is not None and os.path.isfile(SD_MODEL)
 
+def _test_sd_binary():
+    """Test if the SD binary can actually execute (catches missing VC++ runtime on Windows)."""
+    if not SD_BINARY or not os.path.isfile(SD_BINARY):
+        return False
+    try:
+        result = subprocess.run([SD_BINARY, "-h"], capture_output=True, timeout=10)
+        # sd -h returns non-zero but prints help; just check it doesn't crash with DLL errors
+        stderr = result.stderr.decode('utf-8', errors='ignore').lower()
+        if 'dll' in stderr or 'vcruntime' in stderr or 'msvcp' in stderr:
+            return False
+        return True
+    except Exception:
+        return False
+
 # Ollama binary path for engine management
 OLLAMA_BIN = None
 if platform.system() == "Windows":
@@ -1031,6 +1045,7 @@ class ChatHandler(http.server.BaseHTTPRequestHandler):
             "sd_enabled": SD_ENABLED,
             "sd_binary": bool(SD_BINARY),
             "sd_model": bool(os.path.isfile(SD_MODEL)) if SD_MODEL else False,
+            "sd_healthy": _test_sd_binary(),
         })
         self.send_response(200)
         self.send_header("Content-Type", "application/json")

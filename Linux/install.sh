@@ -496,29 +496,42 @@ else
     # Remove any stale/corrupted file
     rm -f "$OLLAMA_BIN"
 
-    ARCHIVE_URL="https://github.com/ollama/ollama/releases/latest/download/ollama-linux-amd64.tar.zst"
-
-    echo -e "      Downloading Ollama engine (streaming - stops after binary extracted)..."
-    # Stream curl → tar: since bin/ollama is the FIRST entry in the archive,
-    # tar exits after extracting it and the pipe breaks — we never download
-    # the hundreds of MB of CUDA libs that follow.
-    curl -L --fail "$ARCHIVE_URL" |  \
-        tar --use-compress-program=zstd -xf - -C "$SHARED_BIN" \
-            --strip-components=1 bin/ollama 2>/dev/null
-    PIPE_RC=${PIPESTATUS[1]}   # tar exit code (0 = extracted successfully)
-
-    # Rename extracted 'ollama' -> 'ollama-linux'
-    if [ -f "$SHARED_BIN/ollama" ]; then
-        mv "$SHARED_BIN/ollama" "$OLLAMA_BIN"
+    # Check drive root for existing binary
+    if copy_from_drive_root "ollama-linux" "$OLLAMA_BIN" 10000000; then
+        if is_elf "$OLLAMA_BIN"; then
+            chmod +x "$OLLAMA_BIN"
+            echo -e "${GRN}      Ollama engine ready (copied from drive root)!${RST}"
+        else
+            echo -e "${RED}      WARNING: Copied file is not a valid ELF binary. Will download.${RST}"
+            rm -f "$OLLAMA_BIN"
+        fi
     fi
 
-    if [ "$PIPE_RC" -ne 0 ] || ! is_elf "$OLLAMA_BIN"; then
-        echo -e "${RED}      ERROR: Extraction failed or binary is invalid!${RST}"
-        rm -f "$OLLAMA_BIN"
-        DOWNLOAD_ERRORS+=("Ollama Engine")
-    else
-        chmod +x "$OLLAMA_BIN"
-        echo -e "${GRN}      Ollama Linux Engine ready!${RST}"
+    if [ ! -f "$OLLAMA_BIN" ]; then
+        ARCHIVE_URL="https://github.com/ollama/ollama/releases/latest/download/ollama-linux-amd64.tar.zst"
+
+        echo -e "      Downloading Ollama engine (streaming - stops after binary extracted)..."
+        # Stream curl → tar: since bin/ollama is the FIRST entry in the archive,
+        # tar exits after extracting it and the pipe breaks — we never download
+        # the hundreds of MB of CUDA libs that follow.
+        curl -L --fail "$ARCHIVE_URL" |  \
+            tar --use-compress-program=zstd -xf - -C "$SHARED_BIN" \
+                --strip-components=1 bin/ollama 2>/dev/null
+        PIPE_RC=${PIPESTATUS[1]}   # tar exit code (0 = extracted successfully)
+
+        # Rename extracted 'ollama' -> 'ollama-linux'
+        if [ -f "$SHARED_BIN/ollama" ]; then
+            mv "$SHARED_BIN/ollama" "$OLLAMA_BIN"
+        fi
+
+        if [ "$PIPE_RC" -ne 0 ] || ! is_elf "$OLLAMA_BIN"; then
+            echo -e "${RED}      ERROR: Extraction failed or binary is invalid!${RST}"
+            rm -f "$OLLAMA_BIN"
+            DOWNLOAD_ERRORS+=("Ollama Engine")
+        else
+            chmod +x "$OLLAMA_BIN"
+            echo -e "${GRN}      Ollama Linux Engine ready!${RST}"
+        fi
     fi
 fi
 

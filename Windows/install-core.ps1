@@ -504,8 +504,28 @@ $TempOllamaDir = "$USB_Drive\Shared\bin\temp_ollama"
 
 if (Test-Path "$USB_Drive\Shared\bin\ollama-windows.exe") {
     Write-Host "      Ollama already installed! Skipping..." -ForegroundColor Green
+} elseif (Copy-ModelFromDriveRoot -FileName "ollama-windows.exe" -DestPath "$USB_Drive\Shared\bin\ollama-windows.exe" -MinSize 10000000) {
+    # copied from drive root
 } else {
-    curl.exe -L --ssl-no-revoke --progress-bar $OllamaURL -o $OllamaDest
+    # Check drive root for the ZIP archive
+    $driveRootZip = Join-Path $DriveRoot "ollama-windows-amd64.zip"
+    if (Test-Path $driveRootZip) {
+        $zipSize = (Get-Item $driveRootZip).Length
+        if ($zipSize -gt 10000000) {
+            $sizeGB = [math]::Round($zipSize / 1GB, 2)
+            Write-Host ""
+            Write-Host "  Found 'ollama-windows-amd64.zip' in drive root ($sizeGB GB)." -ForegroundColor Cyan
+            $useZip = Read-Host "  Use this archive instead of downloading? (yes/no)"
+            if ($useZip.Trim().ToLower() -eq "yes" -or $useZip.Trim().ToLower() -eq "y") {
+                Copy-Item -Path $driveRootZip -Destination $OllamaDest -Force
+                Write-Host "      Copied archive from drive root." -ForegroundColor Green
+            }
+        }
+    }
+
+    if (-not (Test-Path $OllamaDest)) {
+        curl.exe -L --ssl-no-revoke --progress-bar $OllamaURL -o $OllamaDest
+    }
 
     if (Test-Path $OllamaDest) {
         Write-Host "      Extracting Ollama..." -ForegroundColor Yellow

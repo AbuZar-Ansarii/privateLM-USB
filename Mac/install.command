@@ -469,26 +469,40 @@ if [ -f "$OLLAMA_BIN" ] && is_macho "$OLLAMA_BIN" && file_ok "$OLLAMA_BIN" 10000
 else
     rm -f "$OLLAMA_BIN"
 
-    echo -e "      Downloading Ollama engine (streaming - stops after binary extracted)..."
-    # Stream curl → tar: 'ollama' is the first entry in the tgz,
-    # so tar exits as soon as it extracts it and the download stops early.
-    curl -L --fail "$ARCHIVE_URL" | \
-        tar -xzf - -C "$SHARED_BIN" ollama 2>/dev/null
-    PIPE_RC=${PIPESTATUS[1]}
-
-    # Rename extracted 'ollama' -> 'ollama-darwin'
-    if [ -f "$SHARED_BIN/ollama" ]; then
-        mv "$SHARED_BIN/ollama" "$OLLAMA_BIN"
+    # Check drive root for existing binary
+    if copy_from_drive_root "ollama-darwin" "$OLLAMA_BIN" 10000000; then
+        if is_macho "$OLLAMA_BIN"; then
+            chmod +x "$OLLAMA_BIN"
+            xattr -d com.apple.quarantine "$OLLAMA_BIN" 2>/dev/null
+            echo -e "${GRN}      Ollama engine ready (copied from drive root)!${RST}"
+        else
+            echo -e "${RED}      WARNING: Copied file is not a valid Mach-O binary. Will download.${RST}"
+            rm -f "$OLLAMA_BIN"
+        fi
     fi
 
-    if [ "$PIPE_RC" -ne 0 ] || ! is_macho "$OLLAMA_BIN"; then
-        echo -e "${RED}      ERROR: Extraction failed or binary is invalid!${RST}"
-        rm -f "$OLLAMA_BIN"
-        DOWNLOAD_ERRORS+=("Ollama Engine")
-    else
-        chmod +x "$OLLAMA_BIN"
-        xattr -d com.apple.quarantine "$OLLAMA_BIN" 2>/dev/null
-        echo -e "${GRN}      Ollama Mac Engine ready!${RST}"
+    if [ ! -f "$OLLAMA_BIN" ]; then
+        echo -e "      Downloading Ollama engine (streaming - stops after binary extracted)..."
+        # Stream curl → tar: 'ollama' is the first entry in the tgz,
+        # so tar exits as soon as it extracts it and the download stops early.
+        curl -L --fail "$ARCHIVE_URL" | \
+            tar -xzf - -C "$SHARED_BIN" ollama 2>/dev/null
+        PIPE_RC=${PIPESTATUS[1]}
+
+        # Rename extracted 'ollama' -> 'ollama-darwin'
+        if [ -f "$SHARED_BIN/ollama" ]; then
+            mv "$SHARED_BIN/ollama" "$OLLAMA_BIN"
+        fi
+
+        if [ "$PIPE_RC" -ne 0 ] || ! is_macho "$OLLAMA_BIN"; then
+            echo -e "${RED}      ERROR: Extraction failed or binary is invalid!${RST}"
+            rm -f "$OLLAMA_BIN"
+            DOWNLOAD_ERRORS+=("Ollama Engine")
+        else
+            chmod +x "$OLLAMA_BIN"
+            xattr -d com.apple.quarantine "$OLLAMA_BIN" 2>/dev/null
+            echo -e "${GRN}      Ollama Mac Engine ready!${RST}"
+        fi
     fi
 fi
 

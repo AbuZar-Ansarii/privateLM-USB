@@ -430,7 +430,64 @@ if (Test-Path "$USB_Drive\Shared\bin\ollama-windows.exe") {
     }
 }
 
+# =================================================================
+# STEP 6b: Download Stable Diffusion Image Engine
+# =================================================================
+Write-Host ""
+Write-Host "[6b/7] Downloading Stable Diffusion Image Engine (Windows)..." -ForegroundColor Yellow
+$SDZipURL = "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-656-0e4ee04/sd-master-0e4ee04-bin-win-avx2-x64.zip"
+$SDZipDest = "$USB_Drive\Shared\bin\sd-windows.zip"
+$SDDir = "$USB_Drive\Shared\bin\sd-windows"
 
+if (Test-Path "$SDDir\sd.exe") {
+    Write-Host "      Stable Diffusion engine already installed! Skipping..." -ForegroundColor Green
+} else {
+    curl.exe -L --ssl-no-revoke --progress-bar $SDZipURL -o $SDZipDest
+    if (Test-Path $SDZipDest) {
+        Write-Host "      Extracting Stable Diffusion engine..." -ForegroundColor Yellow
+        try {
+            New-Item -ItemType Directory -Force -Path $SDDir | Out-Null
+            Expand-Archive -Path $SDZipDest -DestinationPath $SDDir -Force
+            # If the archive had a top-level folder, flatten it
+            $subDirs = Get-ChildItem -Path $SDDir -Directory -ErrorAction SilentlyContinue
+            if ($subDirs.Count -eq 1) {
+                $subDir = $subDirs[0].FullName
+                Get-ChildItem -Path $subDir | Move-Item -Destination $SDDir -Force
+                Remove-Item -Path $subDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            Remove-Item $SDZipDest -Force -ErrorAction SilentlyContinue
+            Write-Host "      Stable Diffusion engine installed!" -ForegroundColor Green
+        } catch {
+            Write-Host "      ERROR: Failed to extract SD engine." -ForegroundColor Red
+            $downloadErrors += "Stable Diffusion Engine"
+        }
+    } else {
+        Write-Host "      ERROR: Stable Diffusion engine download failed!" -ForegroundColor Red
+        $downloadErrors += "Stable Diffusion Engine"
+    }
+}
+
+# =================================================================
+# STEP 6c: Download CyberRealistic Image Model
+# =================================================================
+Write-Host ""
+Write-Host "[6c/7] Downloading CyberRealistic Image Model (~1.99 GB)..." -ForegroundColor Yellow
+$ImageModelURL = "https://huggingface.co/cyberdelia/CyberRealistic/resolve/main/CyberRealistic_V3.3_FP16.safetensors"
+$ImageModelDest = "$USB_Drive\Shared\models\CyberRealistic_V3.3_FP16.safetensors"
+$ImageModelMinBytes = 2000000000
+
+if (Test-DownloadedFile -Path $ImageModelDest -MinSize $ImageModelMinBytes) {
+    Write-Host "      CyberRealistic model already downloaded! Skipping..." -ForegroundColor Green
+} else {
+    Write-Host "      Downloading... This may take a while. Do NOT close this window!" -ForegroundColor Magenta
+    curl.exe -L --ssl-no-revoke --progress-bar $ImageModelURL -o $ImageModelDest
+    if (Test-DownloadedFile -Path $ImageModelDest -MinSize $ImageModelMinBytes) {
+        Write-Host "      CyberRealistic model downloaded successfully!" -ForegroundColor Green
+    } else {
+        Write-Host "      ERROR: CyberRealistic model download failed or is incomplete!" -ForegroundColor Red
+        $downloadErrors += "CyberRealistic Image Model"
+    }
+}
 
 # =================================================================
 # STEP 7: IMPORT ALL SELECTED MODELS INTO OLLAMA ENGINE
@@ -508,7 +565,7 @@ if ($downloadErrors.Count -gt 0) {
 }
 
 Write-Host ""
-Write-Host "  Installed models:" -ForegroundColor White
+Write-Host "  Installed LLM models:" -ForegroundColor White
 foreach ($m in $SelectedModels) {
     if ($m.Label -eq "UNCENSORED") {
         $tag = "[UNCENSORED]"
@@ -522,6 +579,13 @@ foreach ($m in $SelectedModels) {
     }
     Write-Host "    - $($m.Name) " -ForegroundColor Gray -NoNewline
     Write-Host $tag -ForegroundColor $tagColor
+}
+
+if (Test-Path "$USB_Drive\Shared\models\CyberRealistic_V3.3_FP16.safetensors") {
+    Write-Host ""
+    Write-Host "  Installed Image model:" -ForegroundColor White
+    Write-Host "    - CyberRealistic v3.3 FP16 " -ForegroundColor Gray -NoNewline
+    Write-Host "[UNCENSORED]" -ForegroundColor Red
 }
 
 Write-Host ""

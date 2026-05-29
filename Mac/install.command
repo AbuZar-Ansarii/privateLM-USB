@@ -457,6 +457,77 @@ else
 fi
 
 # ================================================================
+# STEP 6b: Download Stable Diffusion Image Engine
+# ================================================================
+echo ""
+echo -e "${YLW}[6b/7] Downloading Stable Diffusion Image Engine (Mac)...${RST}"
+
+SD_DIR="$SHARED_BIN/sd-mac"
+SD_BIN="$SD_DIR/sd"
+SD_ZIP_URL="https://github.com/leejet/stable-diffusion.cpp/releases/download/master-656-0e4ee04/sd-master-0e4ee04-bin-Darwin-macOS-15.7.7-arm64.zip"
+
+if [ -f "$SD_BIN" ] && file_ok "$SD_BIN" 1000000; then
+    echo -e "${GRN}      Stable Diffusion engine already installed! Skipping...${RST}"
+else
+    rm -rf "$SD_DIR"
+    mkdir -p "$SD_DIR"
+    SD_ZIP="$SHARED_BIN/sd-mac.zip"
+    echo -e "      Downloading Stable Diffusion engine..."
+    curl -L --fail "$SD_ZIP_URL" -o "$SD_ZIP"
+    if [ -f "$SD_ZIP" ]; then
+        echo -e "      Extracting..."
+        unzip -q "$SD_ZIP" -d "$SD_DIR" 2>/dev/null || true
+        rm -f "$SD_ZIP"
+        # If the archive had a top-level folder, flatten it
+        SUBDIR=$(find "$SD_DIR" -maxdepth 1 -mindepth 1 -type d | head -n 1)
+        if [ -n "$SUBDIR" ]; then
+            mv "$SUBDIR"/* "$SD_DIR"/ 2>/dev/null || true
+            rmdir "$SUBDIR" 2>/dev/null || true
+        fi
+        # Find the actual binary (sd or sd-cli)
+        if [ -f "$SD_DIR/sd" ]; then
+            chmod +x "$SD_DIR/sd"
+            xattr -d com.apple.quarantine "$SD_DIR/sd" 2>/dev/null || true
+            echo -e "${GRN}      Stable Diffusion engine installed!${RST}"
+        elif [ -f "$SD_DIR/sd-cli" ]; then
+            chmod +x "$SD_DIR/sd-cli"
+            xattr -d com.apple.quarantine "$SD_DIR/sd-cli" 2>/dev/null || true
+            ln -sf "$SD_DIR/sd-cli" "$SD_DIR/sd" 2>/dev/null || true
+            echo -e "${GRN}      Stable Diffusion engine installed!${RST}"
+        else
+            echo -e "${RED}      ERROR: SD binary not found after extraction.${RST}"
+            echo -e "${YLW}      Note: Mac Intel (x86_64) may need manual compilation.${RST}"
+            DOWNLOAD_ERRORS+=("Stable Diffusion Engine")
+        fi
+    else
+        echo -e "${RED}      ERROR: Stable Diffusion engine download failed!${RST}"
+        DOWNLOAD_ERRORS+=("Stable Diffusion Engine")
+    fi
+fi
+
+# ================================================================
+# STEP 6c: Download CyberRealistic Image Model
+# ================================================================
+echo ""
+echo -e "${YLW}[6c/7] Downloading CyberRealistic Image Model (~1.99 GB)...${RST}"
+
+IMAGE_MODEL="$MODELS_DIR/CyberRealistic_V3.3_FP16.safetensors"
+IMAGE_URL="https://huggingface.co/cyberdelia/CyberRealistic/resolve/main/CyberRealistic_V3.3_FP16.safetensors"
+
+if file_ok "$IMAGE_MODEL" 2000000000; then
+    echo -e "${GRN}      CyberRealistic model already downloaded! Skipping...${RST}"
+else
+    echo -e "      Downloading... This may take a while. Do NOT close this window!"
+    curl -L --fail "$IMAGE_URL" -o "$IMAGE_MODEL"
+    if file_ok "$IMAGE_MODEL" 2000000000; then
+        echo -e "${GRN}      CyberRealistic model downloaded successfully!${RST}"
+    else
+        echo -e "${RED}      ERROR: CyberRealistic model download failed or is incomplete!${RST}"
+        DOWNLOAD_ERRORS+=("CyberRealistic Image Model")
+    fi
+fi
+
+# ================================================================
 # STEP 7: Import models into Ollama
 # ================================================================
 echo ""
@@ -539,7 +610,7 @@ else
 fi
 
 echo ""
-echo -e "${WHT}  Installed models:${RST}"
+echo -e "${WHT}  Installed LLM models:${RST}"
 for NUM in "${SELECTED_NUMS[@]}"; do
     NAME=$(get_field "$NUM" NAME); LABEL=$(get_field "$NUM" LABEL)
     if [ "$LABEL" = "UNCENSORED" ]; then TAG="${RED}[UNCENSORED]${RST}"
@@ -547,6 +618,12 @@ for NUM in "${SELECTED_NUMS[@]}"; do
     echo -e "${GRY}    - ${NAME} ${TAG}"
 done
 $HAS_CUSTOM && [ -n "$CUSTOM_URL" ] && echo -e "${GRY}    - Custom: ${CUSTOM_FILE} ${GRN}[CUSTOM]${RST}"
+
+if file_ok "$IMAGE_MODEL" 2000000000; then
+    echo ""
+    echo -e "${WHT}  Installed Image model:${RST}"
+    echo -e "${GRY}    - CyberRealistic v3.3 FP16 ${RED}[UNCENSORED]${RST}"
+fi
 
 echo ""
 echo -e "${WHT}  To start your AI: Double-click  Mac/start.command${RST}"

@@ -119,5 +119,19 @@
       "label": "UNCENSORED",
       "badge": "HEAVY - FOR 12GB+ RAM"
     }
+  ],
+  "image_models": [
+    {
+      "num": 1,
+      "name": "CyberRealistic v3.3 FP16",
+      "file": "CyberRealistic_V3.3_FP16.safetensors",
+      "url": "https://huggingface.co/cyberdelia/CyberRealistic/resolve/main/CyberRealistic_V3.3_FP16.safetensors",
+      "size": "1.99",
+      "min_bytes": 2000000000,
+      "local": "cyberrealistic-local",
+      "label": "UNCENSORED",
+      "badge": "SD 1.5 - CYBER REALISTIC",
+      "prompt": ""
+    }
   ]
 }

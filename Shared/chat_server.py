@@ -25,8 +25,48 @@ import logging
 import logging.handlers
 import queue
 import uuid
+import subprocess
+import base64
+import re
 from datetime import datetime
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
+
+# ── Image Generation Job Tracking ──────────────────────────────
+IMAGE_JOBS = {}
+IMAGE_JOBS_LOCK = threading.RLock()
+IMAGE_JOB_MAX_AGE_SECS = 3600  # Cleanup old jobs after 1 hour
+
+def _register_image_job(job_id):
+    with IMAGE_JOBS_LOCK:
+        IMAGE_JOBS[job_id] = {
+            "status": "starting",
+            "step": 0,
+            "total_steps": 0,
+            "elapsed_ms": 0,
+            "eta_ms": None,
+            "started_at": time.time(),
+            "updated_at": time.time(),
+            "error": None,
+            "image_b64": None,
+            "params": {},
+        }
+
+def _update_image_job(job_id, **kwargs):
+    with IMAGE_JOBS_LOCK:
+        if job_id in IMAGE_JOBS:
+            IMAGE_JOBS[job_id].update(kwargs)
+            IMAGE_JOBS[job_id]["updated_at"] = time.time()
+
+def _get_image_job(job_id):
+    with IMAGE_JOBS_LOCK:
+        return IMAGE_JOBS.get(job_id, {}).copy()
+
+def _cleanup_old_image_jobs():
+    now = time.time()
+    with IMAGE_JOBS_LOCK:
+        stale = [jid for jid, j in IMAGE_JOBS.items() if now - j["updated_at"] > IMAGE_JOB_MAX_AGE_SECS]
+        for jid in stale:
+            del IMAGE_JOBS[jid]
 
 # Optional: psutil for hardware stats (graceful fallback to native APIs if not installed)
 try:
@@ -44,6 +84,40 @@ if LLAMA_CPP_MODE:
 
 # Always resolve paths relative to THIS script's location (the USB drive)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# ── Stable Diffusion Engine Paths ──────────────────────────────
+def _find_sd_binary():
+    """Locate the stable-diffusion.cpp CLI binary for this platform."""
+    plat = platform.system()
+    bin_dir = os.path.join(SCRIPT_DIR, "bin")
+    candidates = []
+    if plat == "Windows":
+        sd_dir = os.path.join(bin_dir, "sd-windows")
+        candidates = [os.path.join(sd_dir, "sd.exe"), os.path.join(sd_dir, "sd-cli.exe")]
+    elif plat == "Linux":
+        sd_dir = os.path.join(bin_dir, "sd-linux")
+        candidates = [os.path.join(sd_dir, "sd"), os.path.join(sd_dir, "sd-cli")]
+    else:  # Darwin / macOS
+        sd_dir = os.path.join(bin_dir, "sd-mac")
+        candidates = [os.path.join(sd_dir, "sd"), os.path.join(sd_dir, "sd-cli")]
+    for c in candidates:
+        if os.path.isfile(c):
+            return c
+    return None
+
+SD_BINARY = _find_sd_binary()
+SD_MODEL = os.path.join(SCRIPT_DIR, "models", "CyberRealistic_V3.3_FP16.safetensors")
+SD_ENABLED = SD_BINARY is not None and os.path.isfile(SD_MODEL)
+
+# Ollama binary path for engine management
+OLLAMA_BIN = None
+if platform.system() == "Windows":
+    OLLAMA_BIN = os.path.join(SCRIPT_DIR, "bin", "ollama-windows.exe")
+elif platform.system() == "Linux":
+    OLLAMA_BIN = os.path.join(SCRIPT_DIR, "bin", "ollama-linux")
+else:
+    OLLAMA_BIN = os.path.join(SCRIPT_DIR, "bin", "ollama-darwin")
+
 CHATS_DIR = os.path.join(SCRIPT_DIR, "chat_data")
 CHATS_FILE = os.path.join(CHATS_DIR, "chats.json")
 SETTINGS_FILE = os.path.join(CHATS_DIR, "settings.json")
@@ -286,6 +360,242 @@ def _get_hardware_specs():
         pass
     return specs
 
+# ── Stable Diffusion Helpers ───────────────────────────────────
+def _is_ollama_running():
+    """Check if Ollama responds on its default port."""
+    try:
+        req = urllib.request.Request(OLLAMA_HOST + "/api/tags", method="GET")
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            return resp.status == 200
+    except Exception:
+        return False
+
+def _kill_ollama():
+    """Stop any running Ollama process. Platform-specific."""
+    plat = platform.system()
+    try:
+        if plat == "Windows":
+            subprocess.run(["taskkill", "/F", "/IM", "ollama-windows.exe"], capture_output=True)
+            subprocess.run(["taskkill", "/F", "/IM", "ollama.exe"], capture_output=True)
+        elif plat == "Linux":
+            subprocess.run(["pkill", "-f", "ollama-linux"], capture_output=True)
+            subprocess.run(["pkill", "-f", "ollama serve"], capture_output=True)
+        else:  # macOS
+            subprocess.run(["pkill", "-f", "ollama-darwin"], capture_output=True)
+            subprocess.run(["pkill", "-f", "ollama serve"], capture_output=True)
+    except Exception:
+        pass
+    # Wait for port to be free
+    for _ in range(10):
+        if not _is_ollama_running():
+            break
+        time.sleep(0.5)
+
+def _start_ollama():
+    """Start Ollama in the background if binary exists."""
+    if not OLLAMA_BIN or not os.path.isfile(OLLAMA_BIN):
+        return False
+    try:
+        env = os.environ.copy()
+        env["OLLAMA_MODELS"] = os.path.join(SCRIPT_DIR, "models", "ollama_data")
+        env["OLLAMA_ORIGINS"] = "*"
+        env["OLLAMA_HOST"] = "127.0.0.1:11434"
+        subprocess.Popen([OLLAMA_BIN, "serve"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Wait for it to be ready
+        for _ in range(30):
+            if _is_ollama_running():
+                return True
+            time.sleep(1)
+        return False
+    except Exception:
+        return False
+
+def _parse_sd_stderr(stderr_pipe, job_id, total_steps):
+    """Read sd stderr line-by-line and update job progress."""
+    step_pattern = re.compile(r"step\s+(\d+)\s*/\s*(\d+)", re.IGNORECASE)
+    generic_pattern = re.compile(r"(\d+)\s*/\s*(\d+)")
+    pct_pattern = re.compile(r"(\d+)%")
+
+    last_step = 0
+    step_start_time = None
+    step_times = []
+
+    try:
+        for raw_line in iter(stderr_pipe.readline, b""):
+            line = raw_line.decode("utf-8", errors="ignore").strip()
+            if not line:
+                continue
+
+            # Try to extract step / total
+            current_step = 0
+            matched_total = total_steps
+
+            m = step_pattern.search(line)
+            if m:
+                current_step = int(m.group(1))
+                matched_total = int(m.group(2))
+            else:
+                m = generic_pattern.search(line)
+                if m:
+                    current_step = int(m.group(1))
+                    matched_total = int(m.group(2))
+                else:
+                    m = pct_pattern.search(line)
+                    if m and total_steps > 0:
+                        pct = int(m.group(1))
+                        current_step = int(pct / 100.0 * total_steps)
+                        matched_total = total_steps
+
+            if current_step > 0:
+                now = time.time()
+                if step_start_time is not None and current_step > last_step:
+                    for _ in range(current_step - last_step):
+                        step_times.append(now - step_start_time)
+                        if len(step_times) > 10:
+                            step_times.pop(0)
+                step_start_time = now
+                last_step = current_step
+
+                job = _get_image_job(job_id)
+                elapsed = now - job.get("started_at", now)
+                eta_ms = None
+                if current_step < matched_total and step_times:
+                    avg_step = sum(step_times) / len(step_times)
+                    eta_ms = int(avg_step * (matched_total - current_step) * 1000)
+
+                _update_image_job(
+                    job_id,
+                    status="generating",
+                    step=current_step,
+                    total_steps=matched_total,
+                    elapsed_ms=int(elapsed * 1000),
+                    eta_ms=eta_ms,
+                )
+    except Exception:
+        pass
+    finally:
+        stderr_pipe.close()
+
+def _run_sd_generation(job_id, payload, output_path):
+    """Run stable-diffusion.cpp CLI to generate an image asynchronously. Updates job dict."""
+    if not SD_BINARY or not os.path.isfile(SD_BINARY):
+        _update_image_job(job_id, status="error", error="Stable Diffusion engine not found. Please run the installer.")
+        return
+    if not os.path.isfile(SD_MODEL):
+        _update_image_job(job_id, status="error", error="Image model not found. Please run the installer to download CyberRealistic.")
+        return
+
+    prompt = payload.get("prompt", "").strip()
+    if not prompt:
+        _update_image_job(job_id, status="error", error="Prompt is required.")
+        return
+
+    # Clamp parameters to safe ranges
+    steps = max(1, min(50, _safe_int(payload.get("steps"), 20)))
+    cfg = max(1.0, min(15.0, float(payload.get("cfg_scale", 7.0))))
+    width = max(256, min(768, _safe_int(payload.get("width"), 512)))
+    height = max(256, min(768, _safe_int(payload.get("height"), 512)))
+    seed = _safe_int(payload.get("seed"), -1)
+    negative = payload.get("negative_prompt", "").strip()
+    sampling = payload.get("sampling_method", "euler_a")
+    if sampling not in ("euler", "euler_a", "heun", "dpm2", "dpm++2m", "dpm++2mv2"):
+        sampling = "euler_a"
+
+    cmd = [
+        SD_BINARY,
+        "-m", SD_MODEL,
+        "-p", prompt,
+        "-o", output_path,
+        "--steps", str(steps),
+        "--cfg-scale", str(cfg),
+        "--width", str(width),
+        "--height", str(height),
+        "--seed", str(seed),
+        "--sampling-method", sampling,
+        "--rng", "cuda",
+        "-v",
+    ]
+    if negative:
+        cmd += ["-n", negative]
+
+    _update_image_job(
+        job_id,
+        status="starting",
+        step=0,
+        total_steps=steps,
+        params={
+            "prompt": prompt,
+            "negative_prompt": negative,
+            "steps": steps,
+            "cfg_scale": cfg,
+            "width": width,
+            "height": height,
+            "seed": seed,
+            "sampling_method": sampling,
+        },
+    )
+
+    proc = None
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        # Start a thread to parse stderr progress
+        stderr_thread = threading.Thread(
+            target=_parse_sd_stderr,
+            args=(proc.stderr, job_id, steps),
+            daemon=True,
+        )
+        stderr_thread.start()
+
+        proc.wait(timeout=600)
+        stderr_thread.join(timeout=5)
+
+        if proc.returncode != 0:
+            # Try to get any remaining stderr
+            remaining_err = ""
+            try:
+                remaining_err = proc.stderr.read().decode("utf-8", errors="ignore").strip()
+            except Exception:
+                pass
+            err_msg = remaining_err or "Unknown error from SD engine."
+            _update_image_job(job_id, status="error", error=err_msg)
+            return
+
+        if not os.path.isfile(output_path):
+            _update_image_job(job_id, status="error", error="Image generation failed: output file not created.")
+            return
+
+        # Read and encode the PNG
+        with open(output_path, "rb") as f:
+            img_bytes = f.read()
+        img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+
+        # Clean up temp file
+        try:
+            os.remove(output_path)
+        except Exception:
+            pass
+
+        _update_image_job(
+            job_id,
+            status="done",
+            image_b64=img_b64,
+            elapsed_ms=int((time.time() - IMAGE_JOBS[job_id]["started_at"]) * 1000),
+        )
+    except subprocess.TimeoutExpired:
+        if proc:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        _update_image_job(job_id, status="error", error="Image generation timed out (10 minutes).")
+    except Exception as e:
+        if proc:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        _update_image_job(job_id, status="error", error=str(e))
+
 class LogFormatter(logging.Formatter):
     """Readable, multi-line formatter with strict spacing and rich context."""
 
@@ -474,6 +784,18 @@ class ChatHandler(http.server.BaseHTTPRequestHandler):
         elif path == "/api/stats":
             self._get_stats()
 
+        # Engine status API
+        elif path == "/api/engine-status":
+            self._get_engine_status()
+
+        # Image model info API
+        elif path == "/api/image-models":
+            self._get_image_models()
+
+        # Image generation progress API
+        elif path == "/api/image-progress":
+            self._get_image_progress()
+
         # Proxy Ollama API
         elif path.startswith("/ollama/"):
             self._proxy_ollama("GET")
@@ -490,6 +812,17 @@ class ChatHandler(http.server.BaseHTTPRequestHandler):
 
         elif path == "/api/settings":
             self._save_settings()
+
+        # Image generation API
+        elif path == "/api/generate-image":
+            self._generate_image()
+
+        # Engine control APIs
+        elif path == "/api/stop-ollama":
+            self._stop_ollama_endpoint()
+
+        elif path == "/api/start-ollama":
+            self._start_ollama_endpoint()
 
         # Proxy Ollama API
         elif path.startswith("/ollama/"):
@@ -658,6 +991,185 @@ class ChatHandler(http.server.BaseHTTPRequestHandler):
             self._cors_headers()
             self.end_headers()
             self.wfile.write(json.dumps({"error": str(e)}).encode())
+
+    # ── Image Generation API ───────────────────────────────────
+    def _get_image_models(self):
+        """Return the available image generation model(s)."""
+        models = []
+        if SD_ENABLED:
+            models.append({
+                "name": "CyberRealistic v3.3 FP16",
+                "local": "cyberrealistic-local",
+                "file": "CyberRealistic_V3.3_FP16.safetensors",
+                "size": "1.99 GB",
+                "label": "UNCENSORED",
+                "badge": "SD 1.5 - CYBER REALISTIC",
+            })
+        data = json.dumps({"models": models, "sd_enabled": SD_ENABLED})
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self._cors_headers()
+        self.end_headers()
+        self.wfile.write(data.encode())
+
+    def _get_engine_status(self):
+        """Return which engines are currently running."""
+        ollama_up = _is_ollama_running()
+        data = json.dumps({
+            "ollama": ollama_up,
+            "sd_enabled": SD_ENABLED,
+            "sd_binary": bool(SD_BINARY),
+            "sd_model": bool(os.path.isfile(SD_MODEL)) if SD_MODEL else False,
+        })
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self._cors_headers()
+        self.end_headers()
+        self.wfile.write(data.encode())
+
+    def _stop_ollama_endpoint(self):
+        """Stop the Ollama chat engine to free RAM for image generation."""
+        request_context = self._build_request_context("/api/stop-ollama")
+        try:
+            _kill_ollama()
+            _log_event(logging.INFO, "Ollama engine stopped by user", request_context=request_context)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._cors_headers()
+            self.end_headers()
+            self.wfile.write(json.dumps({"ok": True, "message": "Chat engine stopped."}).encode())
+        except Exception as e:
+            _log_event(logging.ERROR, "Failed to stop Ollama", request_context=request_context, exc_info=True)
+            self.send_response(500)
+            self._cors_headers()
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": str(e)}).encode())
+
+    def _start_ollama_endpoint(self):
+        """Restart the Ollama chat engine."""
+        request_context = self._build_request_context("/api/start-ollama")
+        try:
+            if _is_ollama_running():
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self._cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": True, "message": "Chat engine already running."}).encode())
+                return
+            ok = _start_ollama()
+            if ok:
+                _log_event(logging.INFO, "Ollama engine started by user", request_context=request_context)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self._cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": True, "message": "Chat engine started."}).encode())
+            else:
+                raise RuntimeError("Ollama failed to start. Check that the engine is installed.")
+        except Exception as e:
+            _log_event(logging.ERROR, "Failed to start Ollama", request_context=request_context, exc_info=True)
+            self.send_response(500)
+            self._cors_headers()
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": str(e)}).encode())
+
+    def _generate_image(self):
+        """Start an image generation job and return a job_id immediately."""
+        request_context = self._build_request_context("/api/generate-image")
+        body = self._read_body()
+        try:
+            payload = json.loads(body) if body else {}
+        except Exception:
+            payload = {}
+
+        if not SD_ENABLED:
+            self.send_response(503)
+            self.send_header("Content-Type", "application/json")
+            self._cors_headers()
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": "Image generation is not set up. Please run the installer."}).encode())
+            return
+
+        # Warn if Ollama is still running (RAM collision risk)
+        if _is_ollama_running():
+            self.send_response(409)
+            self.send_header("Content-Type", "application/json")
+            self._cors_headers()
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "error": "Chat engine is running. Please stop it first to free memory for image generation.",
+                "needs_stop": True
+            }).encode())
+            return
+
+        # Clean up stale jobs occasionally
+        _cleanup_old_image_jobs()
+
+        job_id = str(uuid.uuid4())
+        output_id = str(uuid.uuid4())
+        output_dir = os.path.join(SCRIPT_DIR, "chat_data", "generated_images")
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, f"{output_id}.png")
+
+        _register_image_job(job_id)
+
+        # Start generation in a background thread so we can return job_id immediately
+        thread = threading.Thread(
+            target=_run_sd_generation,
+            args=(job_id, payload, output_path),
+            daemon=True,
+        )
+        thread.start()
+
+        _log_event(logging.INFO, "Image generation job started", request_context=request_context)
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self._cors_headers()
+        self.end_headers()
+        self.wfile.write(json.dumps({"ok": True, "job_id": job_id}).encode())
+
+    def _get_image_progress(self):
+        """Poll endpoint for image generation progress."""
+        query = parse_qs(urlparse(self.path).query)
+        job_id = query.get("job_id", [None])[0]
+        if not job_id:
+            self.send_response(400)
+            self.send_header("Content-Type", "application/json")
+            self._cors_headers()
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": "Missing job_id parameter."}).encode())
+            return
+
+        job = _get_image_job(job_id)
+        if not job:
+            self.send_response(404)
+            self.send_header("Content-Type", "application/json")
+            self._cors_headers()
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": "Job not found."}).encode())
+            return
+
+        # Build response with progress info
+        resp = {
+            "status": job.get("status"),
+            "step": job.get("step", 0),
+            "total_steps": job.get("total_steps", 0),
+            "elapsed_ms": job.get("elapsed_ms", 0),
+            "eta_ms": job.get("eta_ms"),
+            "params": job.get("params", {}),
+        }
+
+        if job.get("status") == "done":
+            resp["image_b64"] = job.get("image_b64")
+            resp["mime_type"] = "image/png"
+        elif job.get("status") == "error":
+            resp["error"] = job.get("error", "Unknown error.")
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self._cors_headers()
+        self.end_headers()
+        self.wfile.write(json.dumps(resp).encode())
 
     # ── Ollama Proxy (streaming-aware) ─────────────────────────
     def _proxy_ollama(self, method):

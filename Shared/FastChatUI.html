@@ -1705,6 +1705,322 @@
       #main {
         position: relative;
       }
+
+      /* ════════════════════════════════════════════════════════════
+         IMAGE GENERATION PANEL
+        ════════════════════════════════════════════════════════════ */
+      #img-panel {
+        display: none;
+        flex-direction: column;
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px 16px;
+      }
+      #img-panel.on {
+        display: flex;
+      }
+      .img-wrap {
+        max-width: 720px;
+        width: 100%;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .img-warn {
+        background: rgba(253, 176, 57, 0.12);
+        border: 1px solid rgba(253, 176, 57, 0.35);
+        color: var(--orange);
+        padding: 10px 14px;
+        border-radius: var(--radius);
+        font-size: 12.5px;
+        line-height: 1.5;
+      }
+      .img-warn strong {
+        font-weight: 600;
+      }
+      .img-row {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .img-row label {
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--t2);
+      }
+      .img-row textarea {
+        background: var(--bg2);
+        border: 1px solid var(--bd);
+        color: var(--t1);
+        border-radius: var(--radius);
+        padding: 10px 12px;
+        font-size: 14px;
+        font-family: var(--font);
+        resize: vertical;
+        min-height: 64px;
+        outline: none;
+      }
+      .img-row textarea:focus {
+        border-color: var(--bd2);
+        box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.12);
+      }
+      .img-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+      .img-grid .img-row {
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+      }
+      .img-grid .img-row label {
+        min-width: 60px;
+      }
+      .img-grid .img-row input,
+      .img-grid .img-row select {
+        flex: 1;
+        background: var(--bg2);
+        border: 1px solid var(--bd);
+        color: var(--t1);
+        border-radius: var(--radius);
+        padding: 7px 10px;
+        font-size: 13px;
+        font-family: var(--font);
+        outline: none;
+      }
+      .img-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .img-btn {
+        padding: 10px 20px;
+        border-radius: var(--radius-pill);
+        font-size: 13.5px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        font-family: var(--font);
+        transition: background 0.15s, transform 0.1s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .img-btn:hover {
+        transform: translateY(-1px);
+      }
+      .img-btn.primary {
+        background: linear-gradient(135deg, var(--grad1), var(--grad2));
+        color: #fff;
+      }
+      .img-btn.primary:hover {
+        opacity: 0.92;
+      }
+      .img-btn.secondary {
+        background: transparent;
+        border: 1px solid var(--bd);
+        color: var(--t2);
+      }
+      .img-btn.secondary:hover {
+        background: var(--bgh);
+        color: var(--t1);
+      }
+      .img-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .img-preview {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        margin-top: 8px;
+      }
+      .img-preview img {
+        max-width: 100%;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--bd);
+        box-shadow: 0 8px 32px var(--shd);
+      }
+      .img-meta {
+        font-size: 11px;
+        color: var(--t3);
+      }
+      .img-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--bd);
+        border-top-color: var(--grad1);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      .img-status {
+        font-size: 13px;
+        color: var(--t2);
+        text-align: center;
+      }
+      .img-progress-wrap {
+        width: 100%;
+        max-width: 480px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .img-progress-bar-track {
+        width: 100%;
+        height: 8px;
+        background: var(--bg2);
+        border-radius: 4px;
+        overflow: hidden;
+        border: 1px solid var(--bd);
+      }
+      .img-progress-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--grad1), var(--grad2));
+        border-radius: 4px;
+        width: 0%;
+        transition: width 0.4s ease;
+      }
+      .img-progress-info {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: var(--t2);
+        font-weight: 500;
+      }
+      .img-progress-eta {
+        font-size: 12px;
+        color: var(--grad1);
+        font-weight: 600;
+        text-align: center;
+      }
+      .img-params-card {
+        background: var(--bg2);
+        border: 1px solid var(--bd);
+        border-radius: var(--radius);
+        padding: 12px 14px;
+        width: 100%;
+        max-width: 480px;
+      }
+      .img-params-title {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--t3);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 8px;
+      }
+      .img-params-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px 12px;
+      }
+      .img-param {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+      }
+      .img-param-key {
+        color: var(--t3);
+      }
+      .img-param-val {
+        color: var(--t1);
+        font-weight: 500;
+        font-family: 'JetBrains Mono', monospace;
+      }
+      .mode-tabs {
+        display: flex;
+        gap: 4px;
+        background: var(--bg2);
+        padding: 4px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--bd);
+      }
+      .mode-tab {
+        background: none;
+        border: none;
+        color: var(--t2);
+        font-size: 12.5px;
+        font-weight: 600;
+        padding: 6px 14px;
+        border-radius: var(--radius-pill);
+        cursor: pointer;
+        font-family: var(--font);
+        transition: background 0.15s, color 0.15s;
+      }
+      .mode-tab:hover {
+        color: var(--t1);
+      }
+      .mode-tab.act {
+        background: var(--bg3);
+        color: var(--t1);
+        box-shadow: 0 1px 4px var(--shd);
+      }
+
+      /* Image Lightbox Modal */
+      #img-modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.85);
+        z-index: 100;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 16px;
+        padding: 20px;
+      }
+      #img-modal.on {
+        display: flex;
+      }
+      #img-modal img {
+        max-width: 95vw;
+        max-height: 85vh;
+        border-radius: 8px;
+        box-shadow: 0 16px 64px rgba(0,0,0,0.6);
+        cursor: zoom-out;
+      }
+      .img-modal-actions {
+        display: flex;
+        gap: 12px;
+      }
+      .img-modal-btn {
+        background: var(--bg2);
+        border: 1px solid var(--bd);
+        color: var(--t1);
+        padding: 10px 20px;
+        border-radius: var(--radius-pill);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: var(--font);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: background 0.15s;
+      }
+      .img-modal-btn:hover {
+        background: var(--bgh);
+      }
+      .img-modal-close {
+        position: absolute;
+        top: 16px;
+        right: 20px;
+        background: none;
+        border: none;
+        color: var(--t1);
+        font-size: 28px;
+        cursor: pointer;
+        padding: 8px;
+        line-height: 1;
+      }
     </style>
   </head>
   <body>
@@ -1764,6 +2080,12 @@
 
           <div class="tb-title" id="tb-title"></div>
           <div class="tb-sp"></div>
+
+          <!-- Mode Switcher -->
+          <div class="mode-tabs" id="mode-tabs">
+            <button class="mode-tab act" data-mode="chat" id="tab-chat">Chat</button>
+            <button class="mode-tab" data-mode="image" id="tab-image">Image</button>
+          </div>
 
           <button id="sys-prompt-btn" title="System Instructions">
             <i class="fa-solid fa-sliders"></i>
@@ -1993,7 +2315,123 @@
             Responses are generated locally. May contain inaccuracies.
           </p>
         </div>
+
+        <!-- Image Generation Panel -->
+        <div id="img-panel">
+          <div class="img-wrap">
+            <div class="img-warn" id="img-warn">
+              <strong>⚠️ One Model at a Time</strong><br>
+              Image generation requires the Chat engine to be stopped to free memory.
+              Use the buttons below to switch modes.
+            </div>
+
+            <div class="img-row">
+              <label>Prompt</label>
+              <textarea id="img-prompt" placeholder="Describe the image you want to generate..."></textarea>
+            </div>
+
+            <div class="img-row">
+              <label>Negative Prompt</label>
+              <textarea id="img-neg" placeholder="Things to avoid (optional)..." style="min-height:40px"></textarea>
+            </div>
+
+            <div class="img-grid">
+              <div class="img-row">
+                <label>Steps</label>
+                <input type="number" id="img-steps" value="20" min="1" max="50" />
+              </div>
+              <div class="img-row">
+                <label>CFG</label>
+                <input type="number" id="img-cfg" value="7.0" min="1" max="15" step="0.5" />
+              </div>
+              <div class="img-row">
+                <label>Width</label>
+                <select id="img-width">
+                  <option value="256">256</option>
+                  <option value="320">320</option>
+                  <option value="384">384</option>
+                  <option value="448">448</option>
+                  <option value="512" selected>512</option>
+                  <option value="576">576</option>
+                  <option value="640">640</option>
+                  <option value="768">768</option>
+                </select>
+              </div>
+              <div class="img-row">
+                <label>Height</label>
+                <select id="img-height">
+                  <option value="256">256</option>
+                  <option value="320">320</option>
+                  <option value="384">384</option>
+                  <option value="448">448</option>
+                  <option value="512" selected>512</option>
+                  <option value="576">576</option>
+                  <option value="640">640</option>
+                  <option value="768">768</option>
+                </select>
+              </div>
+              <div class="img-row">
+                <label>Seed</label>
+                <input type="number" id="img-seed" value="-1" min="-1" />
+              </div>
+              <div class="img-row">
+                <label>Sampler</label>
+                <select id="img-sampler">
+                  <option value="euler_a" selected>Euler a</option>
+                  <option value="euler">Euler</option>
+                  <option value="heun">Heun</option>
+                  <option value="dpm++2m">DPM++ 2M</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="img-actions">
+              <button class="img-btn primary" id="img-gen-btn">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Generate
+              </button>
+              <button class="img-btn secondary" id="img-stop-ollama">
+                <i class="fa-solid fa-stop"></i> Stop Chat Engine
+              </button>
+              <button class="img-btn secondary" id="img-start-ollama">
+                <i class="fa-solid fa-play"></i> Restart Chat Engine
+              </button>
+            </div>
+
+            <div class="img-preview" id="img-preview">
+              <div id="img-progress" style="display:none; width:100%; align-items:center; flex-direction:column; gap:10px;">
+                <div class="img-progress-wrap">
+                  <div class="img-progress-bar-track">
+                    <div class="img-progress-bar-fill" id="img-bar-fill" style="width:0%"></div>
+                  </div>
+                  <div class="img-progress-info">
+                    <span id="img-step-text">Starting...</span>
+                    <span id="img-time-text">0s</span>
+                  </div>
+                  <div class="img-progress-eta" id="img-eta-text"></div>
+                </div>
+              </div>
+              <div id="img-result" style="display:none; flex-direction:column; align-items:center; gap:12px; width:100%;">
+                <img id="img-result-img" src="" alt="Generated" style="max-width:100%; border-radius:var(--radius-lg); border:1px solid var(--bd); box-shadow:0 8px 32px var(--shd);" />
+                <div class="img-params-card" id="img-params-card">
+                  <div class="img-params-title">Generation Parameters</div>
+                  <div class="img-params-grid" id="img-params-grid"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </main>
+    </div>
+
+    <!-- Image Lightbox Modal -->
+    <div id="img-modal">
+      <button class="img-modal-close" id="img-modal-close" aria-label="Close">&times;</button>
+      <img id="img-modal-img" src="" alt="Enlarged generated image" />
+      <div class="img-modal-actions">
+        <button class="img-modal-btn" id="img-modal-download">
+          <i class="fa-solid fa-download"></i> Download PNG
+        </button>
+      </div>
     </div>
 
     <div id="toasts"></div>
@@ -2029,6 +2467,7 @@
       model: localStorage.getItem('g-model') || '',
       globalSys: '',
       logMode: localStorage.getItem('logMode') || 'errors_only',
+      mode: 'chat', // 'chat' or 'image'
 
         // Attachments (multi-file)
         attachments: [],
@@ -2072,6 +2511,38 @@
       sysClr: $('#clear-global-btn'),
       warn: $('#vision-warn'),
       warnModel: $('#warn-model'),
+
+      // Image generation
+      modeTabs: $('#mode-tabs'),
+      tabChat: $('#tab-chat'),
+      tabImage: $('#tab-image'),
+      imgPanel: $('#img-panel'),
+      imgPrompt: $('#img-prompt'),
+      imgNeg: $('#img-neg'),
+      imgSteps: $('#img-steps'),
+      imgCfg: $('#img-cfg'),
+      imgWidth: $('#img-width'),
+      imgHeight: $('#img-height'),
+      imgSeed: $('#img-seed'),
+      imgSampler: $('#img-sampler'),
+      imgGenBtn: $('#img-gen-btn'),
+      imgStopOllama: $('#img-stop-ollama'),
+      imgStartOllama: $('#img-start-ollama'),
+      imgPreview: $('#img-preview'),
+      imgWarn: $('#img-warn'),
+      inpArea: $('#inp-area'),
+      imgProgress: $('#img-progress'),
+      imgBarFill: $('#img-bar-fill'),
+      imgStepText: $('#img-step-text'),
+      imgTimeText: $('#img-time-text'),
+      imgEtaText: $('#img-eta-text'),
+      imgResult: $('#img-result'),
+      imgResultImg: $('#img-result-img'),
+      imgParamsGrid: $('#img-params-grid'),
+      imgModal: $('#img-modal'),
+      imgModalImg: $('#img-modal-img'),
+      imgModalClose: $('#img-modal-close'),
+      imgModalDownload: $('#img-modal-download'),
     };
 
       // ÔöÇÔöÇ Init ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
@@ -2089,6 +2560,10 @@
         bind();
 
         if (S.convs.length > 0) switchConv(S.convs[0].id);
+
+        // Setup mode tabs
+        D.tabChat.addEventListener('click', () => switchMode('chat'));
+        D.tabImage.addEventListener('click', () => switchMode('image'));
 
         pollHW();
         setInterval(pollHW, 5000);
@@ -2228,6 +2703,259 @@
           D.modelMenu.innerHTML =
             '<div style="padding:16px;font-size:12px;color:var(--red);text-align:center;">Engine Offline</div>';
         }
+      }
+
+      // ── Mode Switching ─────────────────────────────────────────
+      function switchMode(mode) {
+        S.mode = mode;
+        D.tabChat.classList.toggle('act', mode === 'chat');
+        D.tabImage.classList.toggle('act', mode === 'image');
+        D.chat.style.display = mode === 'chat' ? 'flex' : 'none';
+        D.imgPanel.classList.toggle('on', mode === 'image');
+        D.inpArea = document.getElementById('inp-area');
+        if (D.inpArea) D.inpArea.style.display = mode === 'chat' ? 'block' : 'none';
+        if (mode === 'image') {
+          updateEngineStatus();
+        } else {
+          // Reset image UI when leaving image mode
+          D.imgProgress.style.display = 'none';
+          D.imgResult.style.display = 'none';
+        }
+      }
+
+      // ── Engine Status ──────────────────────────────────────────
+      async function updateEngineStatus() {
+        try {
+          const r = await fetch('/api/engine-status');
+          const d = await r.json();
+          const ollamaUp = d.ollama;
+          const sdReady = d.sd_enabled;
+
+          // Update warning
+          if (!sdReady) {
+            D.imgWarn.innerHTML = '<strong>⚠️ Not Installed</strong><br>Image generation engine is missing. Please run the installer.';
+            D.imgWarn.style.display = 'block';
+            D.imgGenBtn.disabled = true;
+            D.imgStopOllama.style.display = 'none';
+            D.imgStartOllama.style.display = 'none';
+            return;
+          }
+
+          if (ollamaUp) {
+            D.imgWarn.innerHTML = '<strong>⚠️ Chat Engine Running</strong><br>Please stop the Chat engine before generating images to prevent out-of-memory crashes.';
+            D.imgWarn.style.display = 'block';
+            D.imgGenBtn.disabled = true;
+            D.imgStopOllama.style.display = 'inline-flex';
+            D.imgStartOllama.style.display = 'none';
+          } else {
+            D.imgWarn.innerHTML = '<strong>✅ Ready</strong><br>Chat engine is stopped. You can generate images safely.';
+            D.imgWarn.style.background = 'rgba(109, 213, 140, 0.12)';
+            D.imgWarn.style.borderColor = 'rgba(109, 213, 140, 0.35)';
+            D.imgWarn.style.color = 'var(--green)';
+            D.imgGenBtn.disabled = false;
+            D.imgStopOllama.style.display = 'none';
+            D.imgStartOllama.style.display = 'inline-flex';
+          }
+        } catch {
+          D.imgWarn.innerHTML = '<strong>⚠️ Offline</strong><br>Cannot reach the server.';
+          D.imgGenBtn.disabled = true;
+        }
+      }
+
+      // ── Image Generation ───────────────────────────────────────
+      function fmtMs(ms) {
+        if (!ms || ms < 0) return '';
+        const sec = Math.floor(ms / 1000);
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        if (m > 0) return `${m}m ${s}s`;
+        return `${s}s`;
+      }
+
+      function showImgProgress() {
+        // Clear any stale error/status messages
+        D.imgPreview.querySelectorAll('.img-status').forEach((el) => el.remove());
+        D.imgProgress.style.display = 'flex';
+        D.imgResult.style.display = 'none';
+        D.imgBarFill.style.width = '0%';
+        D.imgStepText.textContent = 'Starting...';
+        D.imgTimeText.textContent = '0s';
+        D.imgEtaText.textContent = '';
+      }
+
+      function hideImgProgress() {
+        D.imgProgress.style.display = 'none';
+      }
+
+      function updateImgProgressUI(data) {
+        const step = data.step || 0;
+        const total = data.total_steps || 0;
+        const elapsed = data.elapsed_ms || 0;
+        const eta = data.eta_ms;
+
+        if (total > 0) {
+          const pct = Math.min(100, Math.round((step / total) * 100));
+          D.imgBarFill.style.width = `${pct}%`;
+          D.imgStepText.textContent = `Step ${step} / ${total}`;
+        } else {
+          D.imgStepText.textContent = 'Working...';
+        }
+
+        D.imgTimeText.textContent = fmtMs(elapsed);
+
+        if (eta && eta > 0 && step > 0 && step < total) {
+          D.imgEtaText.textContent = `ETA: ${fmtMs(eta)} remaining`;
+        } else if (step >= total && total > 0) {
+          D.imgEtaText.textContent = 'Finishing up...';
+        } else {
+          D.imgEtaText.textContent = 'Calculating ETA...';
+        }
+      }
+
+      function showImgResult(data) {
+        hideImgProgress();
+        D.imgResult.style.display = 'flex';
+        D.imgResultImg.src = `data:${data.mime_type};base64,${data.image_b64}`;
+        D.imgResultImg.style.cursor = 'zoom-in';
+        D.imgResultImg.onclick = () => openImgModal(data.image_b64, data.mime_type);
+
+        const p = data.params || {};
+        const rows = [
+          { k: 'Resolution', v: `${p.width || 512} × ${p.height || 512}` },
+          { k: 'Steps', v: p.steps || 20 },
+          { k: 'CFG Scale', v: p.cfg_scale || 7.0 },
+          { k: 'Sampler', v: p.sampling_method || 'euler_a' },
+          { k: 'Seed', v: p.seed ?? -1 },
+          { k: 'Model', v: 'CyberRealistic v3.3' },
+        ];
+        if (p.negative_prompt) {
+          rows.push({ k: 'Negative', v: p.negative_prompt });
+        }
+        D.imgParamsGrid.innerHTML = rows
+          .map((r) => `<div class="img-param"><span class="img-param-key">${esc(r.k)}</span><span class="img-param-val">${esc(String(r.v))}</span></div>`)
+          .join('');
+      }
+
+      async function generateImage() {
+        const prompt = D.imgPrompt.value.trim();
+        if (!prompt) {
+          toast('Please enter a prompt.');
+          return;
+        }
+        D.imgGenBtn.disabled = true;
+        showImgProgress();
+
+        const payload = {
+          prompt,
+          negative_prompt: D.imgNeg.value.trim(),
+          steps: parseInt(D.imgSteps.value, 10) || 20,
+          cfg_scale: parseFloat(D.imgCfg.value) || 7.0,
+          width: parseInt(D.imgWidth.value, 10) || 512,
+          height: parseInt(D.imgHeight.value, 10) || 512,
+          seed: parseInt(D.imgSeed.value, 10),
+          sampling_method: D.imgSampler.value,
+        };
+
+        let jobId = null;
+        let pollInterval = null;
+
+        try {
+          const startR = await fetch('/api/generate-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const startD = await startR.json();
+          if (!startR.ok || startD.error) {
+            const msg = startD.error || 'Failed to start image generation.';
+            hideImgProgress();
+            D.imgResult.style.display = 'none';
+            D.imgPreview.insertAdjacentHTML('beforeend', `<div class="img-status" style="color:var(--red); margin-top:12px;">${esc(msg)}</div>`);
+            D.imgGenBtn.disabled = false;
+            if (startD.needs_stop) await updateEngineStatus();
+            return;
+          }
+
+          jobId = startD.job_id;
+
+          // Poll progress every 1.2 seconds
+          pollInterval = setInterval(async () => {
+            if (!jobId) return;
+            try {
+              const pr = await fetch(`/api/image-progress?job_id=${encodeURIComponent(jobId)}`);
+              const pd = await pr.json();
+              if (!pr.ok) return;
+
+              if (pd.status === 'done') {
+                clearInterval(pollInterval);
+                pollInterval = null;
+                showImgResult(pd);
+                D.imgGenBtn.disabled = false;
+              } else if (pd.status === 'error') {
+                clearInterval(pollInterval);
+                pollInterval = null;
+                hideImgProgress();
+                D.imgResult.style.display = 'none';
+                D.imgPreview.insertAdjacentHTML('beforeend', `<div class="img-status" style="color:var(--red); margin-top:12px;">${esc(pd.error || 'Generation failed.')}</div>`);
+                D.imgGenBtn.disabled = false;
+              } else {
+                updateImgProgressUI(pd);
+              }
+            } catch {
+              // Ignore poll errors
+            }
+          }, 1200);
+        } catch (e) {
+          hideImgProgress();
+          D.imgResult.style.display = 'none';
+          D.imgPreview.insertAdjacentHTML('beforeend', `<div class="img-status" style="color:var(--red); margin-top:12px;">Network error: ${esc(e.message || 'Failed to generate image.')}</div>`);
+          D.imgGenBtn.disabled = false;
+          if (pollInterval) clearInterval(pollInterval);
+        }
+      }
+
+      // ── Image Lightbox ─────────────────────────────────────────
+      function openImgModal(b64Data, mimeType) {
+        D.imgModalImg.src = `data:${mimeType};base64,${b64Data}`;
+        D.imgModal.classList.add('on');
+        // Set download handler
+        D.imgModalDownload.onclick = () => {
+          const link = document.createElement('a');
+          link.href = `data:${mimeType};base64,${b64Data}`;
+          link.download = `generated_${Date.now()}.png`;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+        };
+      }
+
+      function closeImgModal() {
+        D.imgModal.classList.remove('on');
+        D.imgModalImg.src = '';
+      }
+
+      async function stopChatEngine() {
+        D.imgStopOllama.disabled = true;
+        try {
+          await fetch('/api/stop-ollama', { method: 'POST' });
+          toast('Chat engine stopped.');
+        } catch {
+          toast('Failed to stop chat engine.');
+        }
+        await updateEngineStatus();
+        D.imgStopOllama.disabled = false;
+      }
+
+      async function startChatEngine() {
+        D.imgStartOllama.disabled = true;
+        try {
+          await fetch('/api/start-ollama', { method: 'POST' });
+          toast('Chat engine started.');
+        } catch {
+          toast('Failed to start chat engine.');
+        }
+        await updateEngineStatus();
+        D.imgStartOllama.disabled = false;
       }
 
       function renderModelMenu() {
@@ -3001,6 +3729,20 @@
       D.logModeSel.addEventListener('change', saveLogMode);
       D.sysSet.addEventListener('click', saveGlobalPrompt);
       D.sysClr.addEventListener('click', clearGlobalPrompt);
+
+        // Image generation bindings
+        D.imgGenBtn.addEventListener('click', generateImage);
+        D.imgStopOllama.addEventListener('click', stopChatEngine);
+        D.imgStartOllama.addEventListener('click', startChatEngine);
+
+        // Image lightbox bindings
+        D.imgModalClose.addEventListener('click', closeImgModal);
+        D.imgModal.addEventListener('click', (e) => {
+          if (e.target === D.imgModal) closeImgModal();
+        });
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && D.imgModal.classList.contains('on')) closeImgModal();
+        });
 
         document.addEventListener('click', (e) => {
           if (!D.modelDd.contains(e.target)) toggleModelMenu(false);

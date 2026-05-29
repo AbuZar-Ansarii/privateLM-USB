@@ -55,7 +55,7 @@ def emit_vendors_lines(assets):
 
 def main():
     if len(sys.argv) < 2:
-        eprint("Usage: config_query.py <vendors|models-shell> [desktop|android]")
+        eprint("Usage: config_query.py <vendors|models-shell|image-models-shell> [desktop|android]")
         return 1
 
     cmd = sys.argv[1]
@@ -74,6 +74,11 @@ def main():
         data = load_json(root / "config" / "models.json")
         key = "desktop_models" if profile == "desktop" else "android_models"
         emit_models_shell(data.get(key, []))
+        return 0
+
+    if cmd == "image-models-shell":
+        data = load_json(root / "config" / "models.json")
+        emit_models_shell(data.get("image_models", []))
         return 0
 
     eprint(f"Unknown command: {cmd}")

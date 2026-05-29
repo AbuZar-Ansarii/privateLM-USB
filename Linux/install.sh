@@ -69,6 +69,37 @@ file_ok() {
 }
 
 # ----------------------------------------------------------------
+# Helper: check drive root for existing model files
+# ----------------------------------------------------------------
+DRIVE_ROOT=$(df -P "$USB_ROOT" 2>/dev/null | awk 'NR==2{print $6}')
+[ -z "$DRIVE_ROOT" ] && DRIVE_ROOT="$USB_ROOT"
+[ "$DRIVE_ROOT" = "/" ] && DRIVE_ROOT="$USB_ROOT"
+
+copy_from_drive_root() {
+    local file=$1 dest=$2 minb=$3
+    local src="$DRIVE_ROOT/$file"
+    if [ -f "$src" ]; then
+        local size
+        size=$(stat -c%s "$src" 2>/dev/null || stat -f%z "$src" 2>/dev/null || echo 0)
+        if [ "$size" -gt "$minb" ]; then
+            local size_gb
+            size_gb=$(awk "BEGIN{printf \"%.2f\", $size/1073741824}")
+            echo ""
+            echo -e "${CYN}  Found '$file' in drive root (${size_gb} GB).${RST}"
+            read -r -p "  Use this file instead of downloading? (yes/no): " USE_ROOT
+            local USE_L
+            USE_L=$(echo "$USE_ROOT" | tr '[:upper:]' '[:lower:]')
+            if [ "$USE_L" = "yes" ] || [ "$USE_L" = "y" ]; then
+                cp "$src" "$dest"
+                echo -e "${GRN}      Copied from drive root.${RST}"
+                return 0
+            fi
+        fi
+    fi
+    return 1
+}
+
+# ----------------------------------------------------------------
 # Helper: check file is a valid ELF binary (not an HTML error page)
 # ----------------------------------------------------------------
 is_elf() {
@@ -347,6 +378,9 @@ download_model() {
         fi
     fi
 
+    # Check drive root for existing model
+    if copy_from_drive_root "$FILE" "$DEST" "$MINB"; then return; fi
+
     echo -e "${MAG}      Downloading... This may take a while. Do NOT close this window!${RST}"
 
     SUCCESS=false
@@ -387,6 +421,8 @@ if $HAS_CUSTOM && [ -n "$CUSTOM_URL" ]; then
 
     if file_ok "$DEST" 100000000; then
         echo -e "${GRN}      Already downloaded! Skipping...${RST}"
+    elif copy_from_drive_root "$CUSTOM_FILE" "$DEST" 100000000; then
+        :
     else
         echo -e "${MAG}      Downloading custom model...${RST}"
         curl -L "$CUSTOM_URL" -o "$DEST"
@@ -543,6 +579,8 @@ IMAGE_URL="https://huggingface.co/cyberdelia/CyberRealistic/resolve/main/CyberRe
 
 if file_ok "$IMAGE_MODEL" 2000000000; then
     echo -e "${GRN}      CyberRealistic model already downloaded! Skipping...${RST}"
+elif copy_from_drive_root "CyberRealistic_V3.3_FP16.safetensors" "$IMAGE_MODEL" 2000000000; then
+    :
 else
     echo -e "      Downloading... This may take a while. Do NOT close this window!"
     curl -L --fail "$IMAGE_URL" -o "$IMAGE_MODEL"

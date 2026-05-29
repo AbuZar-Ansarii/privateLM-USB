@@ -130,6 +130,37 @@ get_field() {
     eval echo "\${MODEL_${field}_${num}}"
 }
 
+# ----------------------------------------------------------------
+# Helper: check drive root for existing model files
+# ----------------------------------------------------------------
+DRIVE_ROOT=$(df -P "$USB_ROOT" 2>/dev/null | awk 'NR==2{print $6}')
+[ -z "$DRIVE_ROOT" ] && DRIVE_ROOT="$USB_ROOT"
+[ "$DRIVE_ROOT" = "/" ] && DRIVE_ROOT="$USB_ROOT"
+
+copy_from_drive_root() {
+    local file=$1 dest=$2 minb=$3
+    local src="$DRIVE_ROOT/$file"
+    if [ -f "$src" ]; then
+        local size
+        size=$(stat -c%s "$src" 2>/dev/null || stat -f%z "$src" 2>/dev/null || echo 0)
+        if [ "$size" -gt "$minb" ]; then
+            local size_gb
+            size_gb=$(awk "BEGIN{printf \"%.2f\", $size/1073741824}")
+            echo ""
+            echo -e "${CYN}  Found '$file' in drive root (${size_gb} GB).${RST}"
+            read -r -p "  Use this file instead of downloading? (yes/no): " USE_ROOT
+            local USE_L
+            USE_L=$(echo "$USE_ROOT" | tr '[:upper:]' '[:lower:]')
+            if [ "$USE_L" = "yes" ] || [ "$USE_L" = "y" ]; then
+                cp "$src" "$dest"
+                echo -e "${GRN}      Copied from drive root.${RST}"
+                return 0
+            fi
+        fi
+    fi
+    return 1
+}
+
 # ================================================================
 # 4. Model Retrieval
 # ================================================================
@@ -198,6 +229,8 @@ cd "$MODELS_DIR" || exit 1
 if [ -n "$MODEL_URL" ]; then
     if [ -f "$MODEL_FILE" ]; then
         echo -e "${GRN}      $MODEL_FILE already downloaded!${RST}"
+    elif copy_from_drive_root "$MODEL_FILE" "$MODELS_DIR/$MODEL_FILE" 100000000; then
+        :
     else
         echo -e "${MAG}      Downloading $MODEL_FILE...${RST}"
         termux-wake-lock 2>/dev/null || true

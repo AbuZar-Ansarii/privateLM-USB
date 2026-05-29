@@ -63,6 +63,31 @@ function Test-DownloadedFile {
     return $fileSize -gt $MinSize
 }
 
+# -----------------------------------------------------------------
+# HELPER: Check drive root for existing model files
+# -----------------------------------------------------------------
+$DriveRoot = (Get-Item $USB_Drive).PSDrive.Root
+
+function Copy-ModelFromDriveRoot {
+    param([string]$FileName, [string]$DestPath, [long]$MinSize)
+    $src = Join-Path $DriveRoot $FileName
+    if (Test-Path $src) {
+        $sizeBytes = (Get-Item $src).Length
+        if ($sizeBytes -gt $MinSize) {
+            $sizeGB = [math]::Round($sizeBytes / 1GB, 2)
+            Write-Host ""
+            Write-Host "  Found '$FileName' in drive root ($sizeGB GB)." -ForegroundColor Cyan
+            $use = Read-Host "  Use this file instead of downloading? (yes/no)"
+            if ($use.Trim().ToLower() -eq "yes" -or $use.Trim().ToLower() -eq "y") {
+                Copy-Item -Path $src -Destination $DestPath -Force
+                Write-Host "      Copied from drive root." -ForegroundColor Green
+                return $true
+            }
+        }
+    }
+    return $false
+}
+
 # ================================================================
 # START
 # ================================================================
@@ -285,6 +310,74 @@ New-Item -ItemType Directory -Force -Path "$USB_Drive\Shared\vendor" | Out-Null
 Write-Host "      Done." -ForegroundColor Green
 
 # =================================================================
+# STEP 2b: Ensure 7-Zip portable extractor is available
+# =================================================================
+Write-Host ""
+Write-Host "[2b/7] Preparing 7-Zip portable extractor..." -ForegroundColor Yellow
+
+$SevenZipDir = "$USB_Drive\Shared\bin\7z"
+$SevenZipExe = "$SevenZipDir\7za.exe"
+
+function Expand-ZipArchive {
+    param([string]$ZipPath, [string]$DestDir)
+    if (Test-Path $SevenZipExe) {
+        & $SevenZipExe x $ZipPath -o"$DestDir" -y | Out-Null
+        return
+    }
+    # Fallback to tar (Windows 10+ built-in)
+    try {
+        $null = & tar.exe -xf $ZipPath -C $DestDir 2>$null
+        if ($LASTEXITCODE -eq 0) { return }
+    } catch {}
+    # Final fallback
+    Expand-Archive -Path $ZipPath -DestinationPath $DestDir -Force
+}
+
+if (Test-Path $SevenZipExe) {
+    Write-Host "      7-Zip portable already available." -ForegroundColor Green
+} else {
+    New-Item -ItemType Directory -Force -Path $SevenZipDir | Out-Null
+
+    $SevenZipr = "$SevenZipDir\7zr.exe"
+    $SevenZipExtra = "$SevenZipDir\7z-extra.7z"
+
+    Write-Host "      Downloading 7zr bootstrap..." -ForegroundColor DarkGray
+    curl.exe -L --ssl-no-revoke -o $SevenZipr "https://www.7-zip.org/a/7zr.exe" 2>$null
+
+    if (Test-Path $SevenZipr) {
+        $extraUrls = @(
+            "https://www.7-zip.org/a/7z2601-extra.7z",
+            "https://www.7-zip.org/a/7z2408-extra.7z",
+            "https://www.7-zip.org/a/7z2201-extra.7z"
+        )
+        $downloadedExtra = $false
+        foreach ($url in $extraUrls) {
+            Write-Host "      Downloading 7-Zip extra package..." -ForegroundColor DarkGray
+            curl.exe -L --ssl-no-revoke -o $SevenZipExtra $url 2>$null
+            if (Test-Path $SevenZipExtra) {
+                $downloadedExtra = $true
+                break
+            }
+        }
+
+        if ($downloadedExtra) {
+            & $SevenZipr -y e $SevenZipExtra "x64\7za.exe" -o"$SevenZipDir" | Out-Null
+            if (Test-Path $SevenZipExe) {
+                Remove-Item $SevenZipr -Force -ErrorAction SilentlyContinue
+                Remove-Item $SevenZipExtra -Force -ErrorAction SilentlyContinue
+                Write-Host "      7-Zip portable ready!" -ForegroundColor Green
+            } else {
+                Write-Host "      WARNING: Failed to extract 7za.exe. Will use built-in tools." -ForegroundColor Yellow
+            }
+        } else {
+            Write-Host "      WARNING: Could not download 7-Zip extra. Will use built-in tools." -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "      WARNING: Could not download 7zr.exe. Will use built-in tools." -ForegroundColor Yellow
+    }
+}
+
+# =================================================================
 # STEP 3: Download optional UI vendor assets for offline mode
 # =================================================================
 Write-Host ""
@@ -329,6 +422,11 @@ foreach ($m in $SelectedModels) {
             $m.File = "dolphin-2.9-llama3-8b-Q5_K_M.gguf"
             continue
         }
+    }
+
+    # Check drive root for existing model
+    if (Copy-ModelFromDriveRoot -FileName $m.File -DestPath $dest -MinSize $m.MinBytes) {
+        continue
     }
 
     Write-Host "      Downloading... This may take a while. Do NOT close this window!" -ForegroundColor Magenta
@@ -413,7 +511,7 @@ if (Test-Path "$USB_Drive\Shared\bin\ollama-windows.exe") {
         Write-Host "      Extracting Ollama..." -ForegroundColor Yellow
         try {
             New-Item -ItemType Directory -Force -Path $TempOllamaDir | Out-Null
-            Expand-Archive -Path $OllamaDest -DestinationPath $TempOllamaDir -Force
+            Expand-ZipArchive -ZipPath $OllamaDest -DestDir $TempOllamaDir
             # Move the ollama.exe up and rename it to explicitly be ollama-windows.exe
             Move-Item -Path "$TempOllamaDir\ollama.exe" -Destination "$USB_Drive\Shared\bin\ollama-windows.exe" -Force
             # Cleanup
@@ -447,7 +545,7 @@ if (Test-Path "$SDDir\sd.exe") {
         Write-Host "      Extracting Stable Diffusion engine..." -ForegroundColor Yellow
         try {
             New-Item -ItemType Directory -Force -Path $SDDir | Out-Null
-            Expand-Archive -Path $SDZipDest -DestinationPath $SDDir -Force
+            Expand-ZipArchive -ZipPath $SDZipDest -DestDir $SDDir
             # If the archive had a top-level folder, flatten it
             $subDirs = Get-ChildItem -Path $SDDir -Directory -ErrorAction SilentlyContinue
             if ($subDirs.Count -eq 1) {
@@ -478,6 +576,8 @@ $ImageModelMinBytes = 2000000000
 
 if (Test-DownloadedFile -Path $ImageModelDest -MinSize $ImageModelMinBytes) {
     Write-Host "      CyberRealistic model already downloaded! Skipping..." -ForegroundColor Green
+} elseif (Copy-ModelFromDriveRoot -FileName "CyberRealistic_V3.3_FP16.safetensors" -DestPath $ImageModelDest -MinSize $ImageModelMinBytes) {
+    # copied from drive root
 } else {
     Write-Host "      Downloading... This may take a while. Do NOT close this window!" -ForegroundColor Magenta
     curl.exe -L --ssl-no-revoke --progress-bar $ImageModelURL -o $ImageModelDest

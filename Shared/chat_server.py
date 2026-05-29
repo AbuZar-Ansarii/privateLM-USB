@@ -377,16 +377,27 @@ def _kill_ollama():
         if plat == "Windows":
             subprocess.run(["taskkill", "/F", "/IM", "ollama-windows.exe"], capture_output=True)
             subprocess.run(["taskkill", "/F", "/IM", "ollama.exe"], capture_output=True)
+            subprocess.run(["taskkill", "/F", "/IM", "ollama app.exe"], capture_output=True)
+            # Try to stop Windows service if present (requires admin, may fail silently)
+            subprocess.run(["sc", "stop", "Ollama"], capture_output=True)
+            # Aggressive fallback: kill any process with 'ollama' in the name
+            try:
+                result = subprocess.run(["wmic", "process", "where", "name like '%ollama%'", "delete"],
+                                        capture_output=True, text=True, timeout=5)
+            except Exception:
+                pass
         elif plat == "Linux":
             subprocess.run(["pkill", "-f", "ollama-linux"], capture_output=True)
             subprocess.run(["pkill", "-f", "ollama serve"], capture_output=True)
+            subprocess.run(["pkill", "-f", "ollama"], capture_output=True)
         else:  # macOS
             subprocess.run(["pkill", "-f", "ollama-darwin"], capture_output=True)
             subprocess.run(["pkill", "-f", "ollama serve"], capture_output=True)
+            subprocess.run(["pkill", "-f", "ollama"], capture_output=True)
     except Exception:
         pass
     # Wait for port to be free
-    for _ in range(10):
+    for _ in range(20):
         if not _is_ollama_running():
             break
         time.sleep(0.5)

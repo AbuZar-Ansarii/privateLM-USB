@@ -1739,6 +1739,104 @@
       .img-warn strong {
         font-weight: 600;
       }
+      .img-engine-card {
+        background: var(--bg2);
+        border: 1px solid var(--bd);
+        border-radius: var(--radius);
+        padding: 14px 16px;
+        width: 100%;
+        max-width: 560px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .img-engine-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--t3);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 4px;
+      }
+      .img-engine-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--bd);
+      }
+      .img-engine-row:last-child {
+        border-bottom: none;
+      }
+      .img-engine-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: 1;
+        min-width: 0;
+      }
+      .img-engine-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .img-engine-dot.on {
+        background: var(--green);
+        box-shadow: 0 0 0 3px rgba(109, 213, 140, 0.25);
+      }
+      .img-engine-dot.off {
+        background: var(--red);
+        box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.25);
+      }
+      .img-engine-dot.warn {
+        background: var(--orange);
+        box-shadow: 0 0 0 3px rgba(253, 176, 57, 0.25);
+      }
+      .img-engine-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--t1);
+        white-space: nowrap;
+      }
+      .img-engine-status {
+        font-size: 12px;
+        color: var(--t3);
+        margin-left: auto;
+        white-space: nowrap;
+      }
+      .img-engine-btn {
+        background: var(--bg3);
+        border: 1px solid var(--bd);
+        color: var(--t2);
+        font-size: 12px;
+        font-weight: 600;
+        padding: 5px 12px;
+        border-radius: var(--radius-pill);
+        cursor: pointer;
+        font-family: var(--font);
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .img-engine-btn:hover {
+        background: var(--bg1);
+        color: var(--t1);
+        border-color: var(--bd2);
+      }
+      .img-engine-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .img-engine-btn.primary {
+        background: linear-gradient(135deg, var(--grad1), var(--grad2));
+        border: none;
+        color: #fff;
+      }
+      .img-engine-btn.primary:hover {
+        opacity: 0.92;
+      }
       .img-row {
         display: flex;
         flex-direction: column;
@@ -2330,11 +2428,27 @@
         <!-- Image Generation Panel -->
         <div id="img-panel">
           <div class="img-wrap">
-            <div class="img-warn" id="img-warn">
-              <strong>⚠️ One Model at a Time</strong><br>
-              Image generation requires the Chat engine to be stopped to free memory.
-              Use the buttons below to switch modes.
+            <div class="img-engine-card" id="img-engine-card">
+              <div class="img-engine-title">Engine Control</div>
+              <div class="img-engine-row">
+                <div class="img-engine-info">
+                  <span class="img-engine-dot" id="chat-engine-dot"></span>
+                  <span class="img-engine-name">Chat Engine</span>
+                  <span class="img-engine-status" id="chat-engine-status">Checking...</span>
+                </div>
+                <button class="img-engine-btn" id="img-stop-ollama">Unload</button>
+                <button class="img-engine-btn primary" id="img-start-ollama">Load</button>
+              </div>
+              <div class="img-engine-row">
+                <div class="img-engine-info">
+                  <span class="img-engine-dot on" id="img-engine-dot"></span>
+                  <span class="img-engine-name">Image Engine</span>
+                  <span class="img-engine-status" id="img-engine-status">Checking...</span>
+                </div>
+              </div>
             </div>
+
+            <div class="img-warn" id="img-warn" style="display:none;"></div>
 
             <div class="img-row">
               <label>Prompt</label>
@@ -2399,12 +2513,6 @@
             <div class="img-actions">
               <button class="img-btn primary" id="img-gen-btn">
                 <i class="fa-solid fa-wand-magic-sparkles"></i> Generate
-              </button>
-              <button class="img-btn secondary" id="img-stop-ollama">
-                <i class="fa-solid fa-stop"></i> Stop Chat Engine
-              </button>
-              <button class="img-btn secondary" id="img-start-ollama">
-                <i class="fa-solid fa-play"></i> Restart Chat Engine
               </button>
             </div>
 
@@ -2541,6 +2649,10 @@
       imgStartOllama: $('#img-start-ollama'),
       imgPreview: $('#img-preview'),
       imgWarn: $('#img-warn'),
+      chatEngineDot: $('#chat-engine-dot'),
+      chatEngineStatus: $('#chat-engine-status'),
+      imgEngineDot: $('#img-engine-dot'),
+      imgEngineStatus: $('#img-engine-status'),
       inpArea: $('#inp-area'),
       imgProgress: $('#img-progress'),
       imgBarFill: $('#img-bar-fill'),
@@ -2742,35 +2854,59 @@
           const ollamaUp = d.ollama;
           const sdReady = d.sd_enabled;
 
-          // Update warning
+          // Image engine row
           if (!sdReady) {
-            D.imgWarn.innerHTML = '<strong>⚠️ Not Installed</strong><br>Image generation engine is missing. Please run the installer.';
-            D.imgWarn.style.display = 'block';
+            D.imgEngineDot.className = 'img-engine-dot off';
+            D.imgEngineStatus.textContent = 'Not Installed';
             D.imgGenBtn.disabled = true;
-            D.imgStopOllama.style.display = 'none';
-            D.imgStartOllama.style.display = 'none';
-            return;
+          } else {
+            D.imgEngineDot.className = 'img-engine-dot on';
+            D.imgEngineStatus.textContent = 'Ready';
           }
 
+          // Chat engine row
           if (ollamaUp) {
-            D.imgWarn.innerHTML = '<strong>⚠️ Chat Engine Running</strong><br>Please stop the Chat engine before generating images to prevent out-of-memory crashes.';
-            D.imgWarn.style.display = 'block';
-            D.imgGenBtn.disabled = true;
-            D.imgStopOllama.style.display = 'inline-flex';
+            D.chatEngineDot.className = 'img-engine-dot on';
+            D.chatEngineStatus.textContent = 'Running';
+            D.imgStopOllama.style.display = 'inline-block';
             D.imgStartOllama.style.display = 'none';
+            D.imgGenBtn.disabled = true;
+            D.imgWarn.style.display = 'none';
           } else {
-            D.imgWarn.innerHTML = '<strong>✅ Ready</strong><br>Chat engine is stopped. You can generate images safely.';
-            D.imgWarn.style.background = 'rgba(109, 213, 140, 0.12)';
-            D.imgWarn.style.borderColor = 'rgba(109, 213, 140, 0.35)';
-            D.imgWarn.style.color = 'var(--green)';
-            D.imgGenBtn.disabled = false;
+            D.chatEngineDot.className = 'img-engine-dot off';
+            D.chatEngineStatus.textContent = 'Stopped';
             D.imgStopOllama.style.display = 'none';
-            D.imgStartOllama.style.display = 'inline-flex';
+            D.imgStartOllama.style.display = 'inline-block';
+            D.imgGenBtn.disabled = !sdReady;
+            D.imgWarn.style.display = 'none';
           }
         } catch {
+          D.chatEngineDot.className = 'img-engine-dot warn';
+          D.chatEngineStatus.textContent = 'Unknown';
+          D.imgEngineDot.className = 'img-engine-dot warn';
+          D.imgEngineStatus.textContent = 'Unknown';
           D.imgWarn.innerHTML = '<strong>⚠️ Offline</strong><br>Cannot reach the server.';
+          D.imgWarn.style.display = 'block';
           D.imgGenBtn.disabled = true;
         }
+      }
+
+      async function waitForEngineState(desiredOllamaState, maxWaitMs = 15000) {
+        const interval = 1000;
+        const start = Date.now();
+        while (Date.now() - start < maxWaitMs) {
+          try {
+            const r = await fetch('/api/engine-status');
+            const d = await r.json();
+            if (d.ollama === desiredOllamaState) {
+              await updateEngineStatus();
+              return true;
+            }
+          } catch {}
+          await new Promise((res) => setTimeout(res, interval));
+        }
+        await updateEngineStatus();
+        return false;
       }
 
       // ── Image Generation ───────────────────────────────────────
@@ -2947,25 +3083,29 @@
 
       async function stopChatEngine() {
         D.imgStopOllama.disabled = true;
+        D.chatEngineStatus.textContent = 'Stopping...';
         try {
           await fetch('/api/stop-ollama', { method: 'POST' });
-          toast('Chat engine stopped.');
+          const stopped = await waitForEngineState(false);
+          toast(stopped ? 'Chat engine unloaded.' : 'Chat engine stop timed out — may still be running.');
         } catch {
           toast('Failed to stop chat engine.');
+          await updateEngineStatus();
         }
-        await updateEngineStatus();
         D.imgStopOllama.disabled = false;
       }
 
       async function startChatEngine() {
         D.imgStartOllama.disabled = true;
+        D.chatEngineStatus.textContent = 'Starting...';
         try {
           await fetch('/api/start-ollama', { method: 'POST' });
-          toast('Chat engine started.');
+          const started = await waitForEngineState(true);
+          toast(started ? 'Chat engine loaded.' : 'Chat engine start timed out.');
         } catch {
           toast('Failed to start chat engine.');
+          await updateEngineStatus();
         }
-        await updateEngineStatus();
         D.imgStartOllama.disabled = false;
       }
 

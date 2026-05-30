@@ -571,8 +571,8 @@ def _run_sd_generation(job_id, payload, output_path):
         )
         stderr_thread.start()
 
-        proc.wait(timeout=600)
-        stderr_thread.join(timeout=5)
+        proc.wait()
+        stderr_thread.join()
 
         if proc.returncode != 0:
             # Try to get any remaining stderr

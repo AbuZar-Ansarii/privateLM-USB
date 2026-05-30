@@ -435,18 +435,24 @@ def _start_ollama():
     except Exception:
         return False
 
-def _parse_sd_stderr(stderr_pipe, job_id, total_steps):
-    """Read sd stderr line-by-line and update job progress."""
-    step_pattern = re.compile(r"step\s+(\d+)\s*/\s*(\d+)", re.IGNORECASE)
-    generic_pattern = re.compile(r"(\d+)\s*/\s*(\d+)")
-    pct_pattern = re.compile(r"(\d+)%")
+def _parse_sd_output(pipe, job_id, total_steps):
+    """Read sd stdout+stderr line-by-line and update job progress.
+    stable-diffusion.cpp prints step info like 'step 1 sampling completed'.
+    We merge stdout+stderr so we catch progress regardless of which stream
+    the binary writes it to."""
+    # Match: "step 1 sampling completed" or "step 1/20" or "step 1 of 20"
+    step_pattern = re.compile(r"step\s+(\d+)", re.IGNORECASE)
+    # Only match X/Y when it follows "sampling" to avoid model-loading bars
+    sampling_pattern = re.compile(r"sampling.*?\b(\d+)\s*/\s*(\d+)", re.IGNORECASE)
+    # Only match % when it follows "sampling"
+    pct_pattern = re.compile(r"sampling.*?(\d+)")
 
     last_step = 0
     step_start_time = None
     step_times = []
 
     try:
-        for raw_line in iter(stderr_pipe.readline, b""):
+        for raw_line in iter(pipe.readline, b""):
             line = raw_line.decode("utf-8", errors="ignore").strip()
             if not line:
                 continue
@@ -458,9 +464,8 @@ def _parse_sd_stderr(stderr_pipe, job_id, total_steps):
             m = step_pattern.search(line)
             if m:
                 current_step = int(m.group(1))
-                matched_total = int(m.group(2))
             else:
-                m = generic_pattern.search(line)
+                m = sampling_pattern.search(line)
                 if m:
                     current_step = int(m.group(1))
                     matched_total = int(m.group(2))
@@ -469,7 +474,6 @@ def _parse_sd_stderr(stderr_pipe, job_id, total_steps):
                     if m and total_steps > 0:
                         pct = int(m.group(1))
                         current_step = int(pct / 100.0 * total_steps)
-                        matched_total = total_steps
 
             if current_step > 0:
                 now = time.time()
@@ -499,7 +503,7 @@ def _parse_sd_stderr(stderr_pipe, job_id, total_steps):
     except Exception:
         pass
     finally:
-        stderr_pipe.close()
+        pipe.close()
 
 def _run_sd_generation(job_id, payload, output_path):
     """Run stable-diffusion.cpp CLI to generate an image asynchronously. Updates job dict."""
@@ -562,27 +566,21 @@ def _run_sd_generation(job_id, payload, output_path):
 
     proc = None
     try:
-        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-        # Start a thread to parse stderr progress
-        stderr_thread = threading.Thread(
-            target=_parse_sd_stderr,
-            args=(proc.stderr, job_id, steps),
+        # Merge stdout+stderr so we catch progress regardless of which stream sd uses
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        # Start a thread to parse combined output
+        output_thread = threading.Thread(
+            target=_parse_sd_output,
+            args=(proc.stdout, job_id, steps),
             daemon=True,
         )
-        stderr_thread.start()
+        output_thread.start()
 
         proc.wait()
-        stderr_thread.join()
+        output_thread.join()
 
         if proc.returncode != 0:
-            # Try to get any remaining stderr
-            remaining_err = ""
-            try:
-                remaining_err = proc.stderr.read().decode("utf-8", errors="ignore").strip()
-            except Exception:
-                pass
-            err_msg = remaining_err or "Unknown error from SD engine."
-            _update_image_job(job_id, status="error", error=err_msg)
+            _update_image_job(job_id, status="error", error="Stable Diffusion engine exited with an error. Check server logs.")
             return
 
         if not os.path.isfile(output_path):
@@ -606,13 +604,6 @@ def _run_sd_generation(job_id, payload, output_path):
             image_b64=img_b64,
             elapsed_ms=int((time.time() - IMAGE_JOBS[job_id]["started_at"]) * 1000),
         )
-    except subprocess.TimeoutExpired:
-        if proc:
-            try:
-                proc.kill()
-            except Exception:
-                pass
-        _update_image_job(job_id, status="error", error="Image generation timed out (10 minutes).")
     except Exception as e:
         if proc:
             try:

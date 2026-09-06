@@ -1,6 +1,6 @@
 #!/bin/bash
 # Set Terminal Title
-echo -ne "\033]0;THEVOIDKERNEL - PORTABLE AGENTS (Hermes & Openclaw)\007"
+echo -ne "\033]0;THEVOIDKERNEL - PORTABLE AGENTS (Hermes, OpenClaw & Claude Code)\007"
 
 # ANSI Colors
 RESET="\033[0m"

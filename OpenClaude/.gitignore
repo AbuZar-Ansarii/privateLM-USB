@@ -1,0 +1,15 @@
+# ── Generated / downloaded binaries ──────────────────────────────
+/engine/
+/Windows/bin/
+/Linux/bin/
+/Mac/bin/
+
+# ── Personal data (API keys, chats, logs) ─────────────────────────
+/data/
+
+# ── macOS junk ────────────────────────────────────────────────────
+.DS_Store
+
+# ── Node.js ───────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*

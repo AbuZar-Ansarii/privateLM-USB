@@ -1,21 +1,19 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Set Terminal Title
 echo -ne "\033]0;THEVOIDKERNEL - PORTABLE AGENTS (Hermes, OpenClaw & Claude Code)\007"
 
-# ANSI Colors
 RESET="\033[0m"
 BOLD="\033[1m"
 BRIGHT_CYAN="\033[96m"
-BRIGHT_GREEN="\033[92m"
+BRIGHT_YELLOW="\033[93m"
 GRAY="\033[90m"
 
 echo -e "${BRIGHT_CYAN}===================================================${RESET}"
-echo -e "${BOLD}${BRIGHT_GREEN}                   THEVOIDKERNEL${RESET}"
+echo -e "${BOLD}${BRIGHT_YELLOW}                   THEVOIDKERNEL${RESET}"
 echo -e "${BRIGHT_CYAN}===================================================${RESET}"
-echo -e "${GRAY}[ 🦞 OpenClaw Agent - Portable Workspace Setup & Run ]${RESET}"
+echo -e "${GRAY}[ 🤖 Claude Code (OpenClaude) - Portable Workspace Setup & Run ]${RESET}"
 echo ""
 
-set -eu
-
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/openclaw
-exec sh "$SCRIPT_DIR/bin/unix.sh"
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/OpenClaude
+cd "$SCRIPT_DIR"
+exec bash "$SCRIPT_DIR/start.sh" "$@"

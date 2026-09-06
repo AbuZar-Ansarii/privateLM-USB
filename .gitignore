@@ -1,15 +1,3 @@
-# Shared downloaded runtimes, models, and caches
-Shared/bin/
-Shared/models/
-Shared/python/
-Shared/vendor/
-Shared/chat_data/
-Shared/logs/
-Shared/.ollama-runtime/
-Shared/*.zip
-Shared/*.log
-Shared/llama-server.log
-
 # Hermes runtime cache and user data
 Hermes/data/
 Hermes/.cache/
@@ -27,6 +15,12 @@ openclaw/data/openclaw/
 openclaw/data/home/
 openclaw/data/workspace/
 openclaw/data/temp/
+
+# OpenClaude (Claude Code) runtime cache and user data
+OpenClaude/engine/
+OpenClaude/data/
+OpenClaude/node_modules/
+OpenClaude/*.log
 
 # OS and temporary files
 .DS_Store

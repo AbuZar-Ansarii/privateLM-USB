@@ -1,5 +1,5 @@
 @echo off
-title THEVOIDKERNEL - PORTABLE AGENTS (Hermes & Openclaw)
+title THEVOIDKERNEL - PORTABLE AGENTS (Hermes, OpenClaw & Claude Code)
 
 REM ANSI Color Setup
 for /f %%a in ('echo prompt $E ^| cmd') do set "ESC=%%a"

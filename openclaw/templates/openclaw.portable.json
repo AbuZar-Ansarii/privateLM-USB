@@ -1,0 +1,16 @@
+{
+  "agents": {
+    "defaults": {
+      "workspace": "${OPENCLAW_PORTABLE_WORKSPACE}"
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "port": 18789,
+    "bind": "loopback",
+    "tailscale": {
+      "mode": "off",
+      "resetOnExit": false
+    }
+  }
+}

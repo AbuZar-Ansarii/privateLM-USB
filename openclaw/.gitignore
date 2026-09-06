@@ -1,0 +1,13 @@
+/runtime/
+/packages/
+/logs/
+/data/config/
+/data/openclaw/
+/data/home/
+/data/workspace/
+/data/temp/
+*.log
+*.tmp
+*.partial
+*.bak
+*.last-good
